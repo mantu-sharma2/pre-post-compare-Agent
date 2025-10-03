@@ -1,7 +1,6 @@
 const chatEl = document.getElementById("chat");
 const formEl = document.getElementById("chat-form");
 const inputEl = document.getElementById("query");
-const fullEl = document.getElementById("full-context");
 
 function appendMessage(role, text) {
   const div = document.createElement("div");
@@ -25,7 +24,7 @@ formEl.addEventListener("submit", async (e) => {
     const resp = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: q, full: !!(fullEl && fullEl.checked) }),
+      body: JSON.stringify({ query: q, full: true }),
     });
     const data = await resp.json();
     const bubble = chatEl.lastChild.querySelector(".bubble");

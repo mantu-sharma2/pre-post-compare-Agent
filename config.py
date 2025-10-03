@@ -15,7 +15,7 @@ PRE_XML_FILE_PATH = "pre.xml"
 POST_XML_FILE_PATH = "post.xml"
 MAX_SNIPPETS = 8
 MAX_TOKENS_PER_SNIPPET = 1600  # characters per snippet
-MAX_FULL_CONTEXT_CHARS = 200000  # safety cap when sending entire files
+MAX_FULL_CONTEXT_CHARS = 1500000  # increase cap to reduce truncation risk
 RETRIEVAL_TAGS_OF_INTEREST = {
     "ENBFunction",
     "EUtranCellFDD",

@@ -29,7 +29,7 @@ def index():
 def chat_api():
     payload = request.get_json(force=True)
     user_query: str = (payload or {}).get("query", "").strip()
-    want_full: bool = bool((payload or {}).get("full", False))
+    want_full: bool = True
     if not user_query:
         return jsonify({"error": "query is required"}), 400
 
@@ -52,9 +52,9 @@ def chat_api():
     comparison_html = None
     if wants_compare:
         with open(PRE_XML_FILE_PATH, "r", encoding="utf-8", errors="ignore") as f:
-            pre_text = f.read()[:MAX_FULL_CONTEXT_CHARS]
+            pre_text = f.read()
         with open(POST_XML_FILE_PATH, "r", encoding="utf-8", errors="ignore") as f:
-            post_text = f.read()[:MAX_FULL_CONTEXT_CHARS]
+            post_text = f.read()
         comp = compare_xml(pre_text, post_text)
         if "error" in comp:
             comparison_html = f"<p>Comparison error: {comp['error']}</p>"
