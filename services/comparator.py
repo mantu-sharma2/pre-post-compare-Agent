@@ -46,6 +46,48 @@ def compare_xml(pre_text: str, post_text: str) -> Dict[str, Any]:
         if a != b:
             freq_diffs.append({"tag": t, "pre": a, "post": b})
 
+    # Collect value-level differences for nodes that exist in both trees along the same paths
+    def _collect_leaf_values(root: ET.Element) -> Dict[str, List[str]]:
+        values: Dict[str, List[str]] = {}
+        def walk(node: ET.Element, path: List[str]):
+            tag_name = node.tag.split('}')[-1] if '}' in node.tag else node.tag
+            cur_path = path + [tag_name]
+            children = list(node)
+            # Build a simple value signature: attributes + text content (trimmed)
+            attrs = " ".join(f"{k}={v}" for k, v in sorted(node.attrib.items()))
+            text = (node.text or "").strip()
+            value_sig = (attrs + "|" + text).strip("|")
+            if not children:
+                key = '/'.join(cur_path)
+                values.setdefault(key, []).append(value_sig)
+            for child in children:
+                walk(child, cur_path)
+        walk(root, [])
+        return values
+
+    pre_value_map = _collect_leaf_values(pre_root)
+    post_value_map = _collect_leaf_values(post_root)
+
+    value_differences: List[Dict[str, Any]] = []
+    for path in sorted(set(pre_value_map.keys()) & set(post_value_map.keys())):
+        pre_list = pre_value_map[path]
+        post_list = post_value_map[path]
+        n = min(len(pre_list), len(post_list))
+        for i in range(n):
+            if pre_list[i] != post_list[i]:
+                # Last tag name is the most informative label
+                tag = path.split('/')[-1]
+                value_differences.append({
+                    "tag": tag,
+                    "path": path,
+                    "pre": pre_list[i],
+                    "post": post_list[i],
+                })
+                if len(value_differences) >= 200:
+                    break
+        if len(value_differences) >= 200:
+            break
+
     return {
         "structure_same": structure_same,
         "total_elements_pre": sum(pre_counts.values()),
@@ -53,6 +95,7 @@ def compare_xml(pre_text: str, post_text: str) -> Dict[str, Any]:
         "only_in_pre_paths": only_in_pre,
         "only_in_post_paths": only_in_post,
         "frequency_differences": freq_diffs[:100],
+        "value_differences": value_differences[:200],
     }
 
 

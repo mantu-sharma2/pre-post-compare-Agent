@@ -59,15 +59,15 @@ def chat_api():
         if "error" in comp:
             comparison_text = f"Structure: Different\nValues: Different (count: 0)\nDifferences: Comparison error"
         else:
-            freq = comp.get("frequency_differences", [])
+            value_diffs = comp.get("value_differences", [])
             structure_line = f"Structure: {'Same' if comp['structure_same'] else 'Different'}"
-            diff_count = len(freq)
+            diff_count = len(value_diffs)
             values_line = f"Values: {'Same' if diff_count == 0 else f'Different (count: {diff_count})'}"
             if diff_count == 0:
                 diffs_line = "Differences: -"
             else:
                 top = []
-                for i, d in enumerate(freq[:3], start=1):
+                for i, d in enumerate(value_diffs[:3], start=1):
                     top.append(f"{i}. {d['tag']} pre: {d['pre']}, post: {d['post']}")
                 diffs_line = "Differences: " + "; ".join(top)
             comparison_text = structure_line + "\n" + values_line + "\n" + diffs_line
@@ -100,12 +100,11 @@ def chat_api():
             "Network/DNS or gateway access may be unavailable. "
             "Here are the most relevant XML snippets for your query; please try again later."
         )
-        html = comparison_html or ""
         return jsonify({
-            "answer": (html + ("<p>" + fallback + "</p>") if html else fallback),
+            "answer": fallback,
             "error": str(e),
             "snippets": snippet_ids,
-            "structured": bool(comparison_html),
+            "structured": False,
         }), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
