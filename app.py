@@ -6,7 +6,7 @@ from api_client import RakutenAIClient
 from rag.indexer import RAGIndexer
 from rag.retriever import Retriever
 from services.comparator import compare_xml
-from services.prompt_builder import build_messages, SYSTEM_PROMPT
+from services.prompt_builder import build_messages, build_general_messages, SYSTEM_PROMPT
 from config import PRE_XML_FILE_PATH, POST_XML_FILE_PATH, MAX_FULL_CONTEXT_CHARS, MAX_TOKENS_PER_SNIPPET, MAX_SNIPPETS
 import requests
 
@@ -49,7 +49,7 @@ def chat_api():
 
     # If the question asks for comparison, compute structured diff locally as grounding
     wants_compare = any(w in user_query.lower() for w in ["compare", "difference", "diff", "different", "change"])
-    comparison_html = None
+    comparison_text = None
     if wants_compare:
         with open(PRE_XML_FILE_PATH, "r", encoding="utf-8", errors="ignore") as f:
             pre_text = f.read()
@@ -57,40 +57,42 @@ def chat_api():
             post_text = f.read()
         comp = compare_xml(pre_text, post_text)
         if "error" in comp:
-            comparison_html = f"<p>Comparison error: {comp['error']}</p>"
+            comparison_text = f"Structure: Different\nValues: Different (count: 0)\nDifferences: Comparison error"
         else:
-            paths_pre = comp.get("only_in_pre_paths", [])
-            paths_post = comp.get("only_in_post_paths", [])
             freq = comp.get("frequency_differences", [])
-            rows = "".join(
-                f"<tr><td>{d['tag']}</td><td>{d['pre']}</td><td>{d['post']}</td></tr>" for d in freq[:20]
-            )
-            ul_pre = "".join(f"<li>{p}</li>" for p in paths_pre[:20])
-            ul_post = "".join(f"<li>{p}</li>" for p in paths_post[:20])
-            comparison_html = (
-                f"<section><h3>Structure Same?</h3><p>{'Yes' if comp['structure_same'] else 'No'}</p>"
-                f"<h3>Totals</h3><p>pre: {comp['total_elements_pre']}, post: {comp['total_elements_post']}</p>"
-                f"<h3>Differences</h3>"
-                f"<h4>Tag frequency differences (top 20)</h4>"
-                f"<table><thead><tr><th>tag</th><th>pre</th><th>post</th></tr></thead><tbody>{rows}</tbody></table>"
-                f"<h4>Paths only in pre (top 20)</h4><ul>{ul_pre}</ul>"
-                f"<h4>Paths only in post (top 20)</h4><ul>{ul_post}</ul>"
-                f"</section>"
-            )
+            structure_line = f"Structure: {'Same' if comp['structure_same'] else 'Different'}"
+            diff_count = len(freq)
+            values_line = f"Values: {'Same' if diff_count == 0 else f'Different (count: {diff_count})'}"
+            if diff_count == 0:
+                diffs_line = "Differences: -"
+            else:
+                top = []
+                for i, d in enumerate(freq[:3], start=1):
+                    top.append(f"{i}. {d['tag']} pre: {d['pre']}, post: {d['post']}")
+                diffs_line = "Differences: " + "; ".join(top)
+            comparison_text = structure_line + "\n" + values_line + "\n" + diffs_line
+
+    # If a comparison is requested, return exactly three lines as specified
+    if wants_compare and comparison_text:
+        return jsonify({
+            "answer": comparison_text,
+            "snippets": [],
+            "structured": True,
+        })
 
     messages: List[Dict[str, str]] = build_messages(context, user_query)
 
     try:
         answer = client.chat(messages, temperature=0.1, max_tokens=900)
-        # If comparison was requested, prepend structured section
-        if comparison_html:
-            answer_html = f"{comparison_html}<hr><div>{answer}</div>"
-        else:
-            answer_html = answer
+        # If the model indicates the answer is not in context, try a general fallback
+        if answer.strip().lower().startswith("not found in provided context"):
+            general_messages = build_general_messages(user_query)
+            answer = client.chat(general_messages, temperature=0.3, max_tokens=900)
+        answer_html = answer
         return jsonify({
             "answer": answer_html,
             "snippets": snippet_ids,
-            "structured": bool(comparison_html),
+            "structured": False,
         })
     except requests.exceptions.RequestException as e:
         fallback = (

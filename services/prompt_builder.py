@@ -30,3 +30,17 @@ def build_messages(context: str, user_query: str) -> List[Dict[str, str]]:
     ]
 
 
+# General fallback when the answer is outside provided context
+SYSTEM_GENERAL = (
+    "You are a helpful assistant. Answer the user's question concisely and accurately. "
+    "No special formatting is required; respond naturally."
+)
+
+
+def build_general_messages(user_query: str) -> List[Dict[str, str]]:
+    return [
+        {"role": "system", "content": SYSTEM_GENERAL},
+        {"role": "user", "content": user_query},
+    ]
+
+
