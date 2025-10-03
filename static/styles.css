@@ -55,6 +55,20 @@ header {
   background: var(--muted);
 }
 
+.structured {
+  line-height: 1.5;
+  white-space: normal;
+}
+.structured .kv {
+  margin: 4px 0;
+}
+.structured .diff-list {
+  margin: 4px 0 0 20px;
+}
+.structured .line {
+  margin: 2px 0;
+}
+
 .chat-form {
   display: flex;
   gap: 8px;

@@ -13,6 +13,72 @@ function appendMessage(role, text) {
   chatEl.scrollTop = chatEl.scrollHeight;
 }
 
+function escapeHtml(s) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatAnswer(raw) {
+  if (!raw || typeof raw !== "string") return escapeHtml(String(raw));
+  // If server already returns HTML, pass through
+  if (/<\/?(p|div|table|ul|ol|section|h\d|hr|br|strong|em)/i.test(raw)) {
+    return raw;
+  }
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  // Detect strict 3-line comparison
+  if (
+    lines.length >= 3 &&
+    /^structure:\s*/i.test(lines[0]) &&
+    /^values:\s*/i.test(lines[1]) &&
+    /^differences:\s*/i.test(lines[2])
+  ) {
+    const structureVal = escapeHtml((lines[0].split(":")[1] || "").trim());
+    const valuesVal = escapeHtml((lines[1].split(":")[1] || "").trim());
+    const diffsLine = lines[2];
+    const afterLabel = diffsLine.replace(/^differences:\s*/i, "").trim();
+    let diffsHtml = '<div class="kv">-</div>';
+    if (afterLabel && afterLabel !== "-") {
+      const items = afterLabel
+        .split(/;+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 3);
+      if (items.length) {
+        const lis = items.map((it) => `<li>${escapeHtml(it)}</li>`).join("");
+        diffsHtml = `<ol class=\"diff-list\">${lis}</ol>`;
+      }
+    }
+    return (
+      '<div class="structured">' +
+      `<div class=\"kv\"><strong>Structure:</strong> ${structureVal}</div>` +
+      `<div class=\"kv\"><strong>Values:</strong> ${valuesVal}</div>` +
+      `<div class=\"kv\"><strong>Differences:</strong></div>` +
+      diffsHtml +
+      "</div>"
+    );
+  }
+  // Generic formatter: bold keys before ':' and place each on its own line
+  const html = lines
+    .map((l) => {
+      const m = l.match(/^([^:]+):\s*(.*)$/);
+      if (m) {
+        return `<div class=\"kv\"><strong>${escapeHtml(
+          m[1]
+        )}:</strong> ${escapeHtml(m[2])}</div>`;
+      }
+      return `<div class=\"line\">${escapeHtml(l)}</div>`;
+    })
+    .join("");
+  return `<div class=\"structured\">${html}</div>`;
+}
+
 formEl.addEventListener("submit", async (e) => {
   e.preventDefault();
   const q = inputEl.value.trim();
@@ -28,16 +94,7 @@ formEl.addEventListener("submit", async (e) => {
     });
     const data = await resp.json();
     const bubble = chatEl.lastChild.querySelector(".bubble");
-    // If server returns HTML, render it as HTML; else text
-    if (
-      data &&
-      typeof data.answer === "string" &&
-      /<\/?(p|div|table|ul|ol|section|h\d|hr)/i.test(data.answer)
-    ) {
-      bubble.innerHTML = data.answer;
-    } else {
-      bubble.textContent = data.answer || JSON.stringify(data);
-    }
+    bubble.innerHTML = formatAnswer(data.answer || JSON.stringify(data));
   } catch (err) {
     chatEl.lastChild.querySelector(".bubble").textContent =
       "Error contacting server.";
