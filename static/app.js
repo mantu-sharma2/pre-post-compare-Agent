@@ -32,7 +32,7 @@ function formatAnswer(raw) {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  // Detect strict 3-line comparison
+  // Detect strict 3-line comparison (ensure truly three lines)
   if (
     lines.length >= 3 &&
     /^structure:\s*/i.test(lines[0]) &&
@@ -45,11 +45,12 @@ function formatAnswer(raw) {
     const afterLabel = diffsLine.replace(/^differences:\s*/i, "").trim();
     let diffsHtml = '<div class="kv">-</div>';
     if (afterLabel && afterLabel !== "-") {
-      const items = afterLabel
-        .split(/;+/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, 3);
+      // Robustly split items like "1. x; 2. y; 3. z" while preserving content
+      let items = afterLabel
+        .split(/\s*;\s*/)
+        .map((s) => s.replace(/^\d+\.?\s*/, "").trim())
+        .filter(Boolean);
+      if (items.length > 3) items = items.slice(0, 3);
       if (items.length) {
         const lis = items.map((it) => `<li>${escapeHtml(it)}</li>`).join("");
         diffsHtml = `<ol class=\"diff-list\">${lis}</ol>`;
